@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+<head>
+  <title>Event</title>
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+  <h1>Add Event</h1>
+  <hr>
+
+  <form action="/event" method="POST">
+
+      <label for="event-name">Event name:</label>
+      <input type="text" id="event-name" name="event-name">
+
+      <label for="event-time">Choose your event time:</label>
+      <input type="datetime-local" id="event-time" name="event-time">
+
+      <input type="checkbox" id="repeat" name="repeat" value="repeat">
+      <label for="repeat">Repeat?</label>
+
+    <button type="submit" class="btn btn-primary">POST</button>
+
+  </form>
+
+  <br>
+
+
+
+
+</body>
+</html>
