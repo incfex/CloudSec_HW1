@@ -24,6 +24,12 @@ def add_event():
 
 @app.route("/events", methods=["GET"])
 def get_event():
+  query = datastore_client.query(kind='event')
+  query.order = ['-time']
+
+  events = query.fetch()
+
+  print(list(events))
   return redirect('/')
 
 def fetch_times(limit):
@@ -40,10 +46,10 @@ def root():
     #store_time(datetime.datetime.now())
 
     # Fetch the most recent 10 access times from Datastore.
-    times = fetch_times(10)
+    #times = fetch_times(10)
 
     return render_template(
-        'index.html', times=times)
+        'index.html')
 
 
 if __name__ == '__main__':
