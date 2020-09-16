@@ -6,6 +6,22 @@
   <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+  
+  <table>
+    <thead>
+      <tr>
+        <th colspan="2">ETA</th>
+      </tr>
+    </thead>
+    <tbody id="event-table">
+      <tr>
+        <th scope="col">Time Due</th>
+        <th scope="col">Name</th>
+        <th scope="col">Time Left</th>
+      </tr>
+    </tbody>
+  </table>
+
 
   <h1>Add Event</h1>
   <hr>
