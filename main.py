@@ -1,38 +1,40 @@
 import datetime
 import json
 
-from flask import Flask, render_template, request, redirect, jsonify
+from flask import Flask, render_template, request, redirect, Response, jsonify, send_from_directory, make_response
 from google.cloud import datastore
 
 app = Flask(__name__)
-datastore_client = datastore.Client()
-table_name = 'event'
-root_key = datastore_client.key('Entities', 'root')
+DS = datastore.Client()
+EVENT = 'event'
+ROOT = DS.key('Entities', 'root')
 
 
-@app.route("/event", methods=["POST","DELETE"])
+@app.route("/event", methods=["POST"])
 def add_event():
-    req = request.form
-    print(req)
-    e_name = req.get("event-name")
-    e_time = req.get("event-time")
-
-    entity = datastore.Entity(key=datastore_client.key(table_name))
+    # Since context_type is not set on client side, force request to think context is json
+    req = request.get_json(force=True)
+    # extract info from payload
+    e_name = req["name"]
+    e_time = req["time"]
+    # create entry for datastore
+    entity = datastore.Entity(key=DS.key(EVENT, parent=ROOT))
     entity.update({'name': e_name, 'time': e_time})
-    datastore_client.put(entity)
+    # upload
+    DS.put(entity)
 
-    return redirect('/')
+    return ''
 
 
 @app.route("/events", methods=["GET"])
 def get_event():
-    query = datastore_client.query(kind='event')
+    # set rule for query
+    query = DS.query(kind=EVENT, ancestor=ROOT)
     query.order = ['-time']
-
+    # make query
     events = query.fetch()
-
+    # contrust response
     payload = []
-
     for val in events:
         pl = {
             'id': val.id,
@@ -40,29 +42,19 @@ def get_event():
             'time': val['time']
         }
         payload.append(pl)
-
-    print(payload)
-
+    # send payload
     return jsonify(payload)
 
+@app.route('/event/<int:event_id>', methods=['DELETE'])
+def del_event(event_id):
+    # delete from datastore based on event_id
+    DS.delete(DS.key('event', event_id, parent=ROOT))
+    return ''
 
 @app.route('/')
 def root():
-    # Store the current access time in Datastore.
-    #store_time(datetime.datetime.now())
-
-    # Fetch the most recent 10 access times from Datastore.
-    #times = fetch_times(10)
-
     return render_template('index.html')
 
 
 if __name__ == '__main__':
-    # This is used when running locally only. When deploying to Google App
-    # Engine, a webserver process such as Gunicorn will serve the app. This
-    # can be configured by adding an `entrypoint` to app.yaml.
-    # Flask's development server will automatically serve static files in
-    # the "static" directory. See:
-    # http://flask.pocoo.org/docs/1.0/quickstart/#static-files. Once deployed,
-    # App Engine itself will serve those files as configured in app.yaml.
     app.run(host='127.0.0.1', port=8080, debug=True)

@@ -1,50 +1,46 @@
 <!doctype html>
 <html>
+
 <head>
   <title>Event</title>
-  <script src="{{ url_for('static', filename='script.js') }}"></script>
+
   <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
+
 <body>
-  
+<!--Place for event table-->
   <table>
     <thead>
       <tr>
-        <th colspan="2">ETA</th>
-      </tr>
-    </thead>
-    <tbody id="event-table">
       <tr>
         <th scope="col">Time Due</th>
         <th scope="col">Name</th>
         <th scope="col">Time Left</th>
       </tr>
+      </tr>
+    </thead>
+    <tbody id="event-table">
     </tbody>
   </table>
 
-
+<!--Place for add new event-->
   <h1>Add Event</h1>
   <hr>
 
-  <form action="/event" method="POST">
 
-      <label for="event-name">Event name:</label>
-      <input type="text" id="event-name" name="event-name">
+  <label for="event-name">Event name:</label>
+  <input type="text" id="event-name" name="event-name">
 
-      <label for="event-time">Choose your event time:</label>
-      <input type="datetime-local" id="event-time" name="event-time">
+  <label for="event-time">Choose your event time:</label>
+  <input type="datetime-local" id="event-time" name="event-time">
 
-      <input type="checkbox" id="repeat" name="repeat" value="repeat">
-      <label for="repeat">Repeat?</label>
-
-    <button type="submit" class="btn btn-primary">POST</button>
-
-  </form>
+  <button id="post">POST</button>
 
   <br>
 
 
 
-
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
+
 </html>
