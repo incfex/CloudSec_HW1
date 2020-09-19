@@ -14,7 +14,7 @@ ROOT = DS.key('Entities', 'root')
 def add_event():
     # Since context_type is not set on client side, force request to think context is json
     req = request.get_json(force=True)
-    # extract info from payload
+    # extract event name and time from payload
     e_name = req["name"]
     e_time = req["time"]
     # create entry for datastore
@@ -33,7 +33,7 @@ def get_event():
     query.order = ['-time']
     # make query
     events = query.fetch()
-    # contrust response
+    # contrust response that have entity_id, name, and time
     payload = []
     for val in events:
         pl = {
