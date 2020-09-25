@@ -207,8 +207,10 @@ def get_event():
 def del_event(event_id):
     if verify_token(request) == 0:
         return redirect('/login')
+    username = get_sec(secret=request.cookies.get('session'))['username']
+    parent_key = DS.key(USER, username)
     # delete from datastore based on event_id
-    DS.delete(DS.key(EVENT, event_id, parent=ROOT))
+    DS.delete(DS.key(EVENT, event_id, parent=parent_key))
     return ''
 
 
