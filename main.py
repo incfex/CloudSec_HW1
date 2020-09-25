@@ -1,24 +1,181 @@
 import datetime
 import json
+import hashlib
+import secrets
+import itertools
 
-from flask import Flask, render_template, request, redirect, Response, jsonify, send_from_directory, make_response
+from flask import Flask, render_template, request, redirect, Response, jsonify, send_from_directory, make_response, escape
 from google.cloud import datastore
 
 app = Flask(__name__)
+
 DS = datastore.Client()
 EVENT = 'event'
+USER = 'user'
+TOKEN = 'token'
 ROOT = DS.key('Entities', 'root')
+
+
+def stretch(input):
+    return hashlib.pbkdf2_hmac('sha256', input.encode('utf-8'), b'sugar',
+                               100).hex()
+
+
+@app.route("/error/<message>", methods=["GET"])
+def print_err(message):
+    return render_template('error.html', err_msg=message)
+
+
+def query_usr(username):
+    # query the user based on username
+    usr_query = DS.query(kind=USER, ancestor=ROOT)
+    usr_query.add_filter('username', '=', username)
+    lst_iter = usr_query.fetch()
+    # Duplicate the iterator
+    lst_it, rtn_it = itertools.tee(lst_iter)
+    # See how many user entities were found, if found, return iterator
+    lst_usr = list(lst_it)
+    if len(lst_usr) == 0:
+        return 0
+    elif len(lst_usr) == 1:
+        return rtn_it
+    else:
+        return -1
+
+
+def gen_sec(username):
+    # Generate token
+    token = secrets.token_urlsafe()
+    # Create complete key for upsert
+    key=DS.key('token', username, parent=ROOT)
+    entity = datastore.Entity(key=key)
+    entity.update({'username': username, 'secret': token})
+    # Upsert the token
+    DS.put(entity)
+    return token
+
+
+def get_sec(username=None, secret=None):
+    tok_query = DS.query(kind=TOKEN, ancestor=ROOT)
+
+    # Add filter based on which parameter given
+    if username is not None:
+        tok_query.add_filter('username', '=', username)
+    elif secret is not None:
+        tok_query.add_filter('secret', '=', secret)
+
+    # Get and return the first entry of token
+    tok_iter = iter(tok_query.fetch())
+    tok_db = next(tok_iter, None)
+    if tok_db is not None:
+        return tok_db
+    return None
+
+
+def verify_token(req):
+    # Get token from request
+    token_in = req.cookies.get('session')
+    if token_in is None:
+        return 0
+    
+    # Get token from db
+    token_db = get_sec(secret=token_in)
+    if token_db is None:
+        return 0
+
+    # Compare the tokens
+    if token_db['secret'] == token_in:
+        return token_db
+
+    return 0
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == 'GET':
+        return render_template('register.html')
+
+    # Get info from the form
+    req = request.form
+    username = req.get('username')
+    password = req.get('password')
+    hashed_pass = stretch(password)
+
+    # Query iterator for current user
+    usr_itr = query_usr(username)
+    if usr_itr == 0:
+        # Register the user to db
+        entity = datastore.Entity(key=DS.key(USER, parent=ROOT))
+        entity.update({'username': username, 'password': hashed_pass})
+        DS.put(entity)
+    elif usr_itr == -1:
+        return 'Weird!!!'
+    else:
+        return redirect('/error/User_already_exist')
+
+    # Generate new token
+    token = gen_sec(username)
+
+    # Set the cookie and redirect user
+    resp = make_response(redirect('/'))
+    resp.set_cookie("session", token)
+    return resp
+
+
+@app.route("/login", methods=["GET", "POST"])
+def log_in():
+    if request.method == 'GET':
+        return render_template('login.html')
+
+    # Get info from the form
+    req = request.form
+    username = req.get('username')
+    password = req.get('password')
+    hashed_pass = stretch(password)
+
+    # Query iterator for current user
+    usr_itr = query_usr(username)
+    if usr_itr == 0:
+        return redirect('/error/User_not_found')
+    elif usr_itr == -1:
+        return 'Weird!!!'
+
+    # Compare stretched password
+    if hashed_pass != next(usr_itr)['password']:
+        return redirect('/error/Wrong_password')
+
+    # Generate new token
+    token = gen_sec(username)
+
+    # Set the cookie and redirect user
+    resp = make_response(redirect('/'))
+    resp.set_cookie("session", token)
+    return resp
+
+
+@app.route("/logout", methods=["POST"])
+def log_out():
+    # Get the username based on token
+    tok_db = get_sec(secret=request.cookies.get('session'))
+    if tok_db is not None:
+        # Generate a new token for that user, thus invalid the previous one
+        gen_sec(tok_db['username'])
+    return redirect('/login')
 
 
 @app.route("/event", methods=["POST"])
 def add_event():
+    if verify_token(request) == 0:
+        return redirect('/login')
+    username = get_sec(secret=request.cookies.get('session'))['username']
+    parent_key = DS.key(USER, username)
     # Since context_type is not set on client side, force request to think context is json
     req = request.get_json(force=True)
     # extract event name and time from payload
     e_name = req["name"]
     e_time = req["time"]
     # create entry for datastore
-    entity = datastore.Entity(key=DS.key(EVENT, parent=ROOT))
+    entity = datastore.Entity(key=DS.key(EVENT, parent=parent_key))
     entity.update({'name': e_name, 'time': e_time})
     # upload
     DS.put(entity)
@@ -28,33 +185,60 @@ def add_event():
 
 @app.route("/events", methods=["GET"])
 def get_event():
+    if verify_token(request) == 0:
+        return redirect('/login')
+    username = get_sec(secret=request.cookies.get('session'))['username']
+    parent_key = DS.key(USER, username)
     # set rule for query
-    query = DS.query(kind=EVENT, ancestor=ROOT)
+    query = DS.query(kind=EVENT, ancestor=parent_key)
     query.order = ['-time']
     # make query
     events = query.fetch()
     # contrust response that have entity_id, name, and time
     payload = []
     for val in events:
-        pl = {
-            'id': val.id,
-            'name': val['name'],
-            'time': val['time']
-        }
+        pl = {'id': val.id, 'name': val['name'], 'time': val['time']}
         payload.append(pl)
     # send payload
     return jsonify(payload)
 
+
 @app.route('/event/<int:event_id>', methods=['DELETE'])
 def del_event(event_id):
+    if verify_token(request) == 0:
+        return redirect('/login')
     # delete from datastore based on event_id
-    DS.delete(DS.key('event', event_id, parent=ROOT))
+    DS.delete(DS.key(EVENT, event_id, parent=ROOT))
     return ''
+
 
 @app.route('/')
 def root():
+    if verify_token(request) == 0:
+        return redirect('/login')
     return render_template('index.html')
 
+
+""" The following function are used to migrate
+It basically get all the events, add them to the new user's children, then delete"""
+#@app.route('/migrate')
+#def migrate_data():
+#    if verify_token(request) == 0:
+#        return redirect('/login')
+#    username = get_sec(secret=request.cookies.get('session'))['username']
+#    parent_key = DS.key(USER, username)
+#    query = DS.query(kind=EVENT, ancestor=ROOT)
+#    query.order = ['-time']
+#    # make query
+#    events = query.fetch()
+#    # contrust response that have entity_id, name, and time
+#    for val in events:
+#        entity = datastore.Entity(key=DS.key(EVENT, parent=parent_key))
+#        entity.update({'name': val['name'], 'time': val['time']})
+#        DS.put(entity)
+#        DS.delete(DS.key(EVENT, val.id, parent=ROOT))
+#
+#    return redirect('/')
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080, debug=True)

@@ -125,7 +125,9 @@ function getEvent() {
     })
 }
 
+
 // add listeners
+console.log("FIRST")
 document.getElementById("post").addEventListener("click", addEvent);
 document.addEventListener('DOMContentLoaded', getEvent);
 // start countdown function
