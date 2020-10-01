@@ -101,7 +101,7 @@ def verify_token(req):
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == 'GET':
-        return render_template('register.html')
+        return send_from_directory('static', 'register.html')
 
     # Get info from the form
     req = request.form
@@ -300,7 +300,7 @@ def del_event(event_id):
 def root():
     if verify_token(request) == 0:
         return redirect('/login')
-    return render_template('index.html')
+    return send_from_directory('static', 'index.html')
 
 
 """ The following function are used to migrate
