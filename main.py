@@ -183,6 +183,9 @@ def oidcauth():
     # Set the cookie and redirect user
     resp = make_response(redirect('/'))
     resp.set_cookie("session", token)
+    # Clean up CSRF cookies, comment out for cookie debugging
+    resp.set_cookie("oidc_state", '')
+    resp.set_cookie("nonce", '')
     return resp
 
 
