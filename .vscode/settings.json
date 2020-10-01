@@ -3,5 +3,17 @@
   "cSpell.words": [
     "jsonify"
   ],
-  "python.formatting.provider": "yapf"
+  "python.formatting.provider": "yapf",
+  "cSpell.ignoreWords": [
+    "a",
+    "aki",
+    "aki ngsk o a n mlqa co q b",
+    "b",
+    "co",
+    "mlqa",
+    "n",
+    "ngsk",
+    "o",
+    "q"
+  ]
 }

@@ -159,6 +159,10 @@ def oidcauth():
     body += '=' * (-len(body) % 4)
     claims = json.loads(base64.urlsafe_b64decode(body.encode('utf-8')))
 
+    # Check nonce
+    if claims.get('nonce') != request.cookies.get('nonce'):
+        return redirect('/error/Nonce_does_not_match')
+
     # Login/Register process
     username = claims.get('sub')
     usr_itr = query_usr(username)
@@ -199,6 +203,7 @@ def log_in():
 
         resp = make_response(render_template('login.html', google_login=g_link))
         resp.set_cookie("oidc_state", oidc_state)
+        resp.set_cookie("nonce", nonce)
         return resp
 
     # Get info from the form
